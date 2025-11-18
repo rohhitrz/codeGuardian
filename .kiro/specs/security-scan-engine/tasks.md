@@ -1,0 +1,190 @@
+# Implementation Plan
+
+- [x] 1. Set up project structure and core type definitions
+  - Create directory structure for the Security Scan Engine (src/scanner, src/analyzers, src/models, src/utils)
+  - Define TypeScript interfaces for all core data models (VulnerabilityIssue, ScanResult, ScanMetadata, ParsedCode)
+  - Define enums for Language, SeverityLevel, and analyzer types
+  - Create interface definitions for all components (ISecurityScanEngine, IStaticAnalyzer, ILLMAnalyzer, etc.)
+  - _Requirements: 1.1, 1.2, 6.3-6.10_
+
+- [x] 2. Implement Language Detector
+  - [x] 2.1 Create LanguageDetector class with detection logic
+    - Implement file extension-based detection for .js, .ts, .jsx, .tsx files
+    - Implement content-based detection using regex patterns for JavaScript/TypeScript syntax
+    - Implement isSupported() method to validate language support
+    - _Requirements: 1.1, 1.2, 1.3_
+  - [x] 2.2 Write unit tests for LanguageDetector
+    - Test detection accuracy for JavaScript and TypeScript code samples
+    - Test unsupported language handling
+    - Test edge cases (empty input, mixed content)
+    - _Requirements: 1.1, 1.2, 1.3_
+
+- [x] 3. Implement Code Parser
+  - [x] 3.1 Create CodeParser class with parsing functionality
+    - Implement line-by-line code splitting
+    - Implement basic tokenization for JavaScript/TypeScript
+    - Add error handling for malformed code
+    - Return ParsedCode object with raw code, lines array, and tokens
+    - _Requirements: 1.1, 1.2_
+  - [ ] 3.2 Write unit tests for CodeParser
+    - Test parsing of valid JavaScript and TypeScript code
+    - Test handling of syntax errors
+    - Test special characters and edge cases
+    - _Requirements: 1.1, 1.2_
+
+- [-] 4. Implement Static Analyzer with security rules
+  - [-] 4.1 Create StaticAnalyzer class and Rule interface
+    - Define Rule interface with pattern, severity, OWASP category, description, and fix fields
+    - Implement StaticAnalyzer class with analyze() method
+    - Create rule matching engine that applies regex patterns to code lines
+    - Implement position tracking (line number, column start/end)
+    - _Requirements: 2.1-2.6, 4.1-4.5, 5.1-5.5_
+  - [ ] 4.2 Implement SQL injection detection rule
+    - Create regex pattern to detect string concatenation in SQL queries
+    - Set severity to HIGH and map to OWASP A03:2021
+    - Add description and fix recommendation
+    - _Requirements: 2.1, 4.2, 5.2_
+  - [ ] 4.3 Implement XSS detection rule
+    - Create regex patterns for innerHTML, dangerouslySetInnerHTML, and document.write
+    - Set severity to HIGH and map to OWASP A03:2021
+    - Add description and fix recommendation
+    - _Requirements: 2.2, 4.3, 5.3_
+  - [ ] 4.4 Implement hardcoded credentials detection rule
+    - Create regex patterns for password, apiKey, secret, token in string assignments
+    - Set severity to HIGH and map to OWASP A07:2021
+    - Add description and fix recommendation
+    - _Requirements: 2.3, 4.4, 5.4_
+  - [ ] 4.5 Implement insecure cryptography detection rule
+    - Create regex patterns for MD5, SHA1, DES, and weak crypto functions
+    - Set severity to MEDIUM/HIGH and map to OWASP A02:2021
+    - Add description and fix recommendation
+    - _Requirements: 2.4, 4.5, 5.5_
+  - [x] 4.6 Write unit tests for StaticAnalyzer
+    - Test each security rule independently with vulnerable code samples
+    - Test position accuracy (line and column tracking)
+    - Test false positive scenarios
+    - Test rule engine with multiple rules
+    - _Requirements: 2.1-2.6_
+
+- [x] 5. Implement LLM Analyzer
+  - [x] 5.1 Create LLMAnalyzer class with API integration
+    - Implement LLMAnalyzer class with analyze() method
+    - Create security analysis prompt template
+    - Implement API call to LLM service (OpenAI, Anthropic, or similar,kiro-use urself if possible)
+    - Add timeout configuration and handling
+    - Parse LLM response to extract vulnerability data
+    - _Requirements: 3.1-3.5_
+  - [x] 5.2 Implement response parsing and mapping
+    - Parse LLM JSON/text response to extract title, description, severity, OWASP category, line numbers, and fix
+    - Map LLM findings to VulnerabilityIssue objects
+    - Handle malformed or incomplete LLM responses
+    - _Requirements: 3.2-3.5, 4.1, 5.1_
+  - [x] 5.3 Add error handling and timeout logic
+    - Implement timeout mechanism (default 30 seconds)
+    - Handle API failures gracefully
+    - Log errors without crashing
+    - Return empty results on failure
+    - _Requirements: 8.2, 8.3_
+  - [x] 5.4 Write unit tests for LLMAnalyzer with mocked responses
+    - Mock LLM API responses with sample vulnerability data
+    - Test response parsing logic
+    - Test timeout handling
+    - Test error scenarios (API failure, malformed response)
+    - _Requirements: 3.1-3.5, 8.2_
+
+- [x] 6. Implement Result Aggregator and Deduplicator
+  - [x] 6.1 Create ResultAggregator class
+    - Implement aggregate() method to combine results from multiple analyzers
+    - Handle partial failures (one analyzer succeeds, one fails)
+    - Preserve source information (static vs LLM)
+    - Collect error messages from failed analyzers
+    - _Requirements: 7.3, 8.1, 8.2_
+  - [x] 6.2 Create Deduplicator class
+    - Implement deduplicate() method with line number and issue type comparison
+    - Use ±1 line tolerance for matching
+    - Implement fuzzy title matching for duplicate detection
+    - Prefer LLM explanations when merging duplicates
+    - _Requirements: 7.4_
+  - [x] 6.3 Write unit tests for aggregation and deduplication
+    - Test aggregation with multiple analyzer results
+    - Test deduplication logic with duplicate issues
+    - Test handling of partial failures
+    - Test edge cases (no duplicates, all duplicates)
+    - _Requirements: 7.3, 7.4_
+
+- [x] 7. Implement Formatter
+  - [x] 7.1 Create Formatter class for JSON output
+    - Implement format() method to produce ScanResult JSON
+    - Sort issues by severity (Critical → Info) then by line number
+    - Add scan metadata (timestamp, duration, language, lines of code, analyzers used)
+    - Ensure all required fields are present in output
+    - Generate unique IDs for each issue
+    - _Requirements: 6.1-6.10_
+  - [x] 7.2 Write unit tests for Formatter
+    - Test JSON structure matches ScanResult interface
+    - Test sorting logic (severity and line number)
+    - Test metadata generation
+    - Test with empty issues array
+    - _Requirements: 6.1-6.10_
+
+- [x] 8. Implement Security Scan Engine orchestrator
+  - [x] 8.1 Create SecurityScanEngine class
+    - Implement scan() method as main entry point
+    - Validate input (non-empty code, supported language)
+    - Instantiate and coordinate all components (detector, parser, analyzers, aggregator, deduplicator, formatter)
+    - _Requirements: 1.1-1.4, 7.1, 7.2_
+  - [x] 8.2 Implement parallel analyzer execution
+    - Execute StaticAnalyzer and LLMAnalyzer concurrently using Promise.all()
+    - Handle individual analyzer failures without blocking the other
+    - Collect results from both analyzers
+    - _Requirements: 7.1, 7.2, 8.1, 8.2_
+  - [x] 8.3 Add comprehensive error handling
+    - Implement input validation with error messages for empty code and unsupported languages
+    - Handle parser errors and continue with analysis
+    - Handle analyzer failures with graceful degradation
+    - Return error information in ScanResult when failures occur
+    - _Requirements: 1.3, 1.4, 8.1-8.4_
+  - [x] 8.4 Write integration tests for SecurityScanEngine
+    - Test end-to-end scan with vulnerable code samples
+    - Test with both analyzers enabled
+    - Test with only static analyzer (LLM disabled/failed)
+    - Test with only LLM analyzer (static failed)
+    - Test error scenarios (invalid input, both analyzers fail)
+    - _Requirements: 1.1-1.4, 7.1-7.5, 8.1-8.4_
+
+- [x] 9. Create configuration and utilities
+  - [x] 9.1 Implement configuration management
+    - Create configuration file/class for LLM settings (API key, model, timeout, temperature)
+    - Create configuration for static analyzer (enabled rules, severity thresholds)
+    - Create configuration for scan limits (max code size, max issues)
+    - Support environment variable overrides
+    - _Requirements: 8.2_
+  - [x] 9.2 Implement error handler utility
+    - Create ErrorHandler class with methods for different error types
+    - Implement error logging
+    - Implement error message formatting for ScanResult
+    - _Requirements: 8.1-8.4_
+  - [x] 9.3 Add input sanitization utilities
+    - Implement code length validation
+    - Implement input sanitization before LLM submission
+    - Add security checks to prevent prompt injection
+    - _Requirements: 1.4_
+
+- [x] 10. Create example usage and API endpoint
+  - [x] 10.1 Create example script demonstrating scanner usage
+    - Write example code showing how to instantiate and use SecurityScanEngine
+    - Include sample vulnerable code for testing
+    - Show how to process and display results
+    - _Requirements: 1.1, 6.1_
+  - [x] 10.2 Create API endpoint for scan requests
+    - Implement REST API endpoint (POST /api/scan) that accepts code and language
+    - Validate request body
+    - Call SecurityScanEngine.scan()
+    - Return ScanResult as JSON response
+    - Add rate limiting middleware
+    - _Requirements: 1.1-1.4, 6.1-6.10_
+  - [x] 10.3 Write API integration tests
+    - Test API endpoint with valid requests
+    - Test error responses for invalid input
+    - Test rate limiting
+    - _Requirements: 1.1-1.4_
